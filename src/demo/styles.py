@@ -297,6 +297,132 @@ button[data-baseweb="tab"][aria-selected="true"] {
     margin: 0.8rem 0;
 }
 
+.ranking-pulse {
+    position: relative;
+    overflow: hidden;
+    margin: 0.9rem 0 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    border-radius: 16px;
+    background: #FFFFFF;
+    box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+}
+
+.ranking-pulse::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: linear-gradient(180deg, #2563EB, #0F766E, #7C3AED, #F97316);
+}
+
+.pulse-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 0.75rem;
+}
+
+.pulse-kicker {
+    color: var(--blue);
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.pulse-title {
+    color: var(--blue-dark);
+    font-size: 1.3rem;
+    font-weight: 900;
+}
+
+.pulse-note, .pulse-detail, .pulse-empty {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.pulse-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+.pulse-stat {
+    min-height: 92px;
+    padding: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #F8FAFC;
+}
+
+.pulse-label {
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.pulse-value {
+    color: var(--blue-dark);
+    font-size: 1.55rem;
+    line-height: 1.1;
+    font-weight: 900;
+    margin: 0.2rem 0;
+}
+
+.pulse-subtitle {
+    color: var(--blue-dark);
+    font-weight: 850;
+    margin: 0.85rem 0 0.45rem;
+}
+
+.pulse-documents {
+    display: grid;
+    gap: 0.42rem;
+}
+
+.pulse-document {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(240px, auto);
+    gap: 0.7rem;
+    align-items: center;
+    padding: 0.55rem 0.65rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.pulse-document:hover {
+    border-color: rgba(37, 99, 235, 0.45);
+    transform: translateX(2px);
+}
+
+.pulse-document-title {
+    color: var(--blue-dark);
+    font-size: 0.82rem;
+    font-weight: 750;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pulse-ranks {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.3rem;
+}
+
+.pulse-rank {
+    padding: 0.18rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--model-color) 45%, white);
+    background: color-mix(in srgb, var(--model-color) 9%, white);
+    color: var(--model-color);
+    font-size: 0.67rem;
+    font-weight: 850;
+}
+
 .metric-card {
     padding: 0.75rem;
     border-radius: 15px;
@@ -662,21 +788,35 @@ div[data-testid="stHorizontalBlock"] {
     div[data-testid="stButtonGroup"] button:last-child {
         grid-column: 1 / -1;
     }
-    .compare-grid, .summary-grid, .metrics-grid, .pipeline, .case-grid {
+    .compare-grid, .summary-grid, .metrics-grid, .pipeline, .case-grid, .pulse-stats {
         grid-template-columns: 1fr;
     }
+    .pulse-document { grid-template-columns: 1fr; }
+    .pulse-ranks { justify-content: flex-start; }
     .model-column-body { max-height: none; }
 }
 
 @media (max-width: 620px) {
-    .hero-title { font-size: 2rem; }
+    .block-container { padding: 0.55rem 0.65rem 1.5rem; }
+    .hero-title { font-size: 1.55rem; line-height: 1.08; }
     .hero {
-        grid-template-columns: 82px minmax(0, 1fr);
-        padding: 0.65rem;
-        border-radius: 14px;
+        grid-template-columns: 64px minmax(0, 1fr);
+        gap: 0.65rem;
+        padding: 0.58rem;
+        border-radius: 12px;
+        margin-bottom: 0.55rem;
     }
-    .hero-logo { max-width: 82px; }
-    .hero-subtitle { font-size: 0.86rem; }
+    .hero-logo { max-width: 64px; }
+    .hero-subtitle { font-size: 0.78rem; line-height: 1.35; margin: 0.35rem 0 0.45rem; }
+    .hero-badges { gap: 0.28rem; }
+    .badge { min-height: 1.35rem; padding: 0.15rem 0.38rem; font-size: 0.62rem; }
+    .event-mark { font-size: 0.7rem; padding: 0.25rem 0.4rem; }
+    div[data-testid="stButtonGroup"] { margin-bottom: 0.45rem; }
+    div[data-testid="stButtonGroup"] button { min-height: 2.15rem; font-size: 0.78rem; padding: 0.2rem; }
+    .status-box { padding: 0.62rem; }
+    .ranking-pulse { padding: 0.78rem; }
+    .pulse-heading { align-items: flex-start; flex-direction: column; gap: 0.2rem; }
+    .pulse-document-title { white-space: normal; }
     .result-card { min-height: auto; }
 }
 </style>

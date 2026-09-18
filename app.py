@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -19,13 +20,14 @@ from src.demo.components import (
     improvement_cards,
     metrics_grid,
     pipeline_diagram,
+    ranking_pulse,
     render_header,
     render_model_reference,
     sidebar_dataset_stat,
     single_results,
     status_box,
 )
-from src.demo.constants import CASE_DEFINITIONS, DATASET_STATS, EXAMPLE_QUERIES
+from src.demo.constants import CASE_DEFINITIONS, DATASET_STATS, EXAMPLE_QUERIES, MODEL_COLORS
 from src.demo.search_service import (
     HYBRID_ALPHA,
     MODEL_LABELS,
@@ -187,6 +189,7 @@ def run_search(
 
     st.markdown(f"<div class='section-title'>Resultados para: {display_query}</div>", unsafe_allow_html=True)
 
+    metrics_by_model = None
     if has_ground_truth:
         metrics_by_model = {
             model: query_metrics(ranking, qrels_for_query)
@@ -199,17 +202,38 @@ def run_search(
         for model, ranking in model_rankings.items()
     }
     if compare:
+        ranking_pulse(rows_by_model, metrics_by_model)
         comparison_results(rows_by_model, shared_document_positions(rows_by_model))
     else:
         model = models[0]
         single_results(model, rows_by_model[model])
 
 
-def set_search_example(state_key: str, example: str) -> None:
-    st.session_state[state_key] = example
+def set_search_example_from_widget(state_key: str, widget_key: str) -> None:
+    example = st.session_state.get(widget_key)
+    if example:
+        st.session_state[state_key] = example
 
 
-def search_bar(state_key: str, default: str, button_label: str) -> tuple[str, bool]:
+def search_bar(dataset: str, state_key: str, default: str, button_label: str) -> tuple[str, bool]:
+    bundle = cached_dataset(dataset)
+    if dataset == "trec-covid":
+        query_ids = list(bundle.queries)
+        selected_query_id = st.selectbox(
+            "Escolha uma pergunta oficial do TREC-COVID",
+            query_ids,
+            format_func=lambda query_id: f"Q{query_id} - {bundle.queries[query_id]}",
+            key=f"{state_key}_benchmark_query",
+        )
+        clicked = st.button(
+            button_label,
+            type="primary",
+            use_container_width=True,
+            key=f"{state_key}_submit",
+        )
+        st.caption("Consulta oficial do benchmark: qrels e metricas por query estao disponiveis.")
+        return bundle.queries[selected_query_id], clicked
+
     if state_key not in st.session_state:
         st.session_state[state_key] = default
 
@@ -224,16 +248,15 @@ def search_bar(state_key: str, default: str, button_label: str) -> tuple[str, bo
     with button_col:
         clicked = st.button(button_label, type="primary", use_container_width=True, key=f"{state_key}_submit")
 
-    st.markdown('<div class="example-row"><strong>Exemplos:</strong></div>', unsafe_allow_html=True)
-    columns = st.columns(len(EXAMPLE_QUERIES))
-    for column, example in zip(columns, EXAMPLE_QUERIES):
-        column.button(
-            example,
-            use_container_width=True,
-            key=f"{state_key}_{example}",
-            on_click=set_search_example,
-            args=(state_key, example),
-        )
+    example_key = f"{state_key}_example"
+    st.selectbox(
+        "Experimente uma consulta",
+        [""] + EXAMPLE_QUERIES,
+        format_func=lambda value: value or "Escolha um exemplo rapido",
+        key=example_key,
+        on_change=set_search_example_from_widget,
+        args=(state_key, example_key),
+    )
     return query_text, clicked
 
 
@@ -249,8 +272,40 @@ def show_results_page() -> None:
 
     ndcg = benchmark_ndcg_table(benchmark)
     st.markdown('<div class="section-title">nDCG@10 por modelo e dataset</div>', unsafe_allow_html=True)
-    st.dataframe(ndcg.style.format("{:.6f}"), use_container_width=True)
-    st.bar_chart(ndcg)
+    chart_data = benchmark[["dataset", "model", "ndcg@10"]].copy()
+    chart_data["Dataset"] = chart_data["dataset"].map(
+        {key: value["label"] for key, value in DATASET_STATS.items()}
+    )
+    chart_data["Modelo"] = chart_data["model"].map(MODEL_LABELS)
+    model_labels = [MODEL_LABELS[model] for model in MODEL_ORDER]
+    model_colors = [MODEL_COLORS[model] for model in MODEL_ORDER]
+    bars = (
+        alt.Chart(chart_data)
+        .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+        .encode(
+            x=alt.X("Dataset:N", sort=[DATASET_STATS[key]["label"] for key in DATASET_STATS], title=None),
+            xOffset=alt.XOffset("Modelo:N", sort=model_labels),
+            y=alt.Y("ndCG:Q", title="nDCG@10", scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color(
+                "Modelo:N",
+                sort=model_labels,
+                scale=alt.Scale(domain=model_labels, range=model_colors),
+                legend=alt.Legend(orient="bottom", title=None),
+            ),
+            tooltip=[
+                alt.Tooltip("Dataset:N"),
+                alt.Tooltip("Modelo:N"),
+                alt.Tooltip("ndCG:Q", title="nDCG@10", format=".4f"),
+            ],
+        )
+        .transform_calculate(ndCG="datum['ndcg@10']")
+    )
+    labels = bars.mark_text(dy=-8, color="#334155", fontSize=11).encode(
+        text=alt.Text("ndCG:Q", format=".3f")
+    )
+    st.altair_chart((bars + labels).properties(height=380), use_container_width=True)
+    with st.expander("Ver valores completos"):
+        st.dataframe(ndcg.style.format("{:.6f}"), use_container_width=True)
 
 
 def show_cases_page(dataset: str, top_k: int) -> None:
@@ -353,7 +408,7 @@ with st.sidebar:
     st.caption(f"Reranker: {DEFAULT_RERANKER_MODEL}, pool={RERANKER_CANDIDATE_POOL}")
     st.caption(f"Device detectado: {cosine_device_label()}")
 
-pages = ["Buscar", "Comparar", "Casos do Experimento", "Resultados", "Como Funciona"]
+pages = ["Buscar", "Comparar", "Casos", "Resultados", "Como Funciona"]
 page = st.segmented_control(
     "Navegacao principal",
     pages,
@@ -364,7 +419,7 @@ page = st.segmented_control(
 ) or "Buscar"
 
 if page == "Buscar":
-    query_text, clicked = search_bar("search_query", "How are knowledge graphs used in education?", "Buscar")
+    query_text, clicked = search_bar(dataset, "search_query", "How are knowledge graphs used in education?", "Buscar")
     if clicked:
         st.session_state.last_query = query_text
         st.session_state.last_query_dataset = dataset
@@ -378,7 +433,7 @@ if page == "Buscar":
         )
 elif page == "Comparar":
     st.markdown('<div class="section-title">Comparacao lado a lado</div>', unsafe_allow_html=True)
-    query_text, clicked = search_bar("compare_query", "How are knowledge graphs used in education?", "Comparar")
+    query_text, clicked = search_bar(dataset, "compare_query", "How are knowledge graphs used in education?", "Comparar")
     if clicked:
         st.session_state.last_compare_query = query_text
         st.session_state.last_compare_dataset = dataset
@@ -391,7 +446,7 @@ elif page == "Comparar":
             "Comparacao pronta para iniciar",
             "Escolha a consulta e clique em Comparar para executar os modelos selecionados.",
         )
-elif page == "Casos do Experimento":
+elif page == "Casos":
     show_cases_page(dataset, top_k)
 elif page == "Resultados":
     show_results_page()

@@ -147,6 +147,7 @@ def result_card_html(
     row: dict[str, object],
     model: str,
     shared_positions: dict[str, dict[str, int]] | None = None,
+    model_count: int = 1,
 ) -> str:
     color = MODEL_COLORS.get(model, "#2563EB")
     soft = MODEL_SOFT_COLORS.get(model, "#DBEAFE")
@@ -160,7 +161,7 @@ def result_card_html(
         ]
         overlap = (
             "<div class='overlap'>"
-            f"Aparece em {len(positions)}/4 modelos<br>{escape(' / '.join(pieces))}"
+            f"Aparece em {len(positions)}/{model_count} modelos<br>{escape(' / '.join(pieces))}"
             "</div>"
         )
     return _clean_html(
@@ -193,8 +194,9 @@ def comparison_results(
     shared_positions: dict[str, dict[str, int]],
 ) -> None:
     columns = []
+    model_count = len(rows_by_model)
     for model, rows in rows_by_model.items():
-        cards = "".join(result_card_html(row, model, shared_positions) for row in rows)
+        cards = "".join(result_card_html(row, model, shared_positions, model_count) for row in rows)
         color = MODEL_COLORS[model]
         columns.append(
             _clean_html(
@@ -215,6 +217,107 @@ def comparison_results(
             )
         )
     st.markdown(f"<div class='compare-grid'>{''.join(columns)}</div>", unsafe_allow_html=True)
+
+
+def ranking_pulse(
+    rows_by_model: dict[str, list[dict[str, object]]],
+    metrics_by_model: dict[str, object] | None = None,
+) -> None:
+    if len(rows_by_model) < 2:
+        return
+
+    documents: dict[str, dict[str, object]] = {}
+    positions: dict[str, dict[str, int]] = {}
+    for model, rows in rows_by_model.items():
+        for row in rows:
+            document_id = str(row["document_id"])
+            documents.setdefault(document_id, row)
+            positions.setdefault(document_id, {})[model] = int(row["position"])
+
+    shared = [document_id for document_id, found in positions.items() if len(found) >= 2]
+    exclusive = [document_id for document_id, found in positions.items() if len(found) == 1]
+    cards = []
+
+    if metrics_by_model:
+        winner, winner_metrics = max(
+            metrics_by_model.items(),
+            key=lambda item: item[1].ndcg_at_10,
+        )
+        cards.append(
+            _clean_html(
+                f"""
+            <div class="pulse-stat pulse-winner">
+              <div class="pulse-label">Maior nDCG@10 nesta query</div>
+              <div class="pulse-value" style="color:{MODEL_COLORS[winner]}">{winner_metrics.ndcg_at_10:.3f}</div>
+              <div class="pulse-detail">{MODEL_LABELS[winner]}</div>
+            </div>
+            """
+            )
+        )
+
+    cards.extend(
+        [
+            _clean_html(
+                f"""
+            <div class="pulse-stat">
+              <div class="pulse-label">Consenso no Top {len(next(iter(rows_by_model.values()), []))}</div>
+              <div class="pulse-value">{len(shared)}</div>
+              <div class="pulse-detail">artigos em dois ou mais rankings</div>
+            </div>
+            """
+            ),
+            _clean_html(
+                f"""
+            <div class="pulse-stat">
+              <div class="pulse-label">Divergencia</div>
+              <div class="pulse-value">{len(exclusive)}</div>
+              <div class="pulse-detail">artigos exclusivos de um modelo</div>
+            </div>
+            """
+            ),
+        ]
+    )
+
+    consensus_rows = []
+    ordered = sorted(
+        shared,
+        key=lambda document_id: (-len(positions[document_id]), min(positions[document_id].values())),
+    )[:5]
+    for document_id in ordered:
+        row = documents[document_id]
+        rank_badges = "".join(
+            f'<span class="pulse-rank" style="--model-color:{MODEL_COLORS[model]}">{MODEL_LABELS[model]} #{rank}</span>'
+            for model, rank in positions[document_id].items()
+        )
+        consensus_rows.append(
+            _clean_html(
+                f"""
+            <div class="pulse-document">
+              <div class="pulse-document-title">{escape(str(row['title']))}</div>
+              <div class="pulse-ranks">{rank_badges}</div>
+            </div>
+            """
+            )
+        )
+
+    consensus = "".join(consensus_rows) or '<div class="pulse-empty">Nenhum artigo repetido neste recorte.</div>'
+    st.markdown(
+        f"""
+        <section class="ranking-pulse">
+          <div class="pulse-heading">
+            <div>
+              <div class="pulse-kicker">Leitura instantanea</div>
+              <div class="pulse-title">Pulso do ranking</div>
+            </div>
+            <div class="pulse-note">Resumo descritivo dos rankings exibidos</div>
+          </div>
+          <div class="pulse-stats">{''.join(cards)}</div>
+          <div class="pulse-subtitle">Onde os modelos concordam</div>
+          <div class="pulse-documents">{consensus}</div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def benchmark_cards(best: pd.DataFrame) -> None:
