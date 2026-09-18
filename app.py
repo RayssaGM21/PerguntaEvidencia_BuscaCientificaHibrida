@@ -358,14 +358,23 @@ if page == "Buscar":
     query_text, clicked = search_bar("search_query", "How are knowledge graphs used in education?", "Buscar")
     if clicked:
         st.session_state.last_query = query_text
-    run_search(dataset, st.session_state.get("last_query", query_text), models[:1], top_k, False)
+        st.session_state.last_query_dataset = dataset
+    if st.session_state.get("last_query_dataset") == dataset and "last_query" in st.session_state:
+        run_search(dataset, st.session_state.last_query, models[:1], top_k, False)
+    else:
+        status_box(
+            "info",
+            "Pesquisa pronta para iniciar",
+            "Escolha a consulta e clique em Buscar para executar o modelo selecionado.",
+        )
 elif page == "Comparar":
     st.markdown('<div class="section-title">Comparacao lado a lado</div>', unsafe_allow_html=True)
     query_text, clicked = search_bar("compare_query", "How are knowledge graphs used in education?", "Comparar")
     if clicked:
         st.session_state.last_compare_query = query_text
+        st.session_state.last_compare_dataset = dataset
     compare_models = models if compare else MODEL_ORDER
-    if "last_compare_query" in st.session_state:
+    if st.session_state.get("last_compare_dataset") == dataset and "last_compare_query" in st.session_state:
         run_search(dataset, st.session_state.last_compare_query, compare_models, top_k, True)
     else:
         status_box(
