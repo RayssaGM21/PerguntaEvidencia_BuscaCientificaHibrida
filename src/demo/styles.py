@@ -226,8 +226,12 @@ div[data-testid="stButtonGroup"] button {
 }
 
 div[data-testid="stButtonGroup"] button[data-testid="stBaseButton-segmented_controlActive"] {
-    color: #FFFFFF;
+    color: #FFFFFF !important;
     background: var(--blue);
+}
+
+div[data-testid="stButtonGroup"] button[data-testid="stBaseButton-segmented_controlActive"] * {
+    color: #FFFFFF !important;
 }
 
 button[data-baseweb="tab"] {
@@ -701,14 +705,18 @@ div.stButton > button:hover {
 
 div.stButton > button[kind="primary"] {
     background: var(--blue);
-    color: #FFFFFF;
+    color: #FFFFFF !important;
     border-color: var(--blue);
     box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
 }
 
+div.stButton > button[kind="primary"] * {
+    color: #FFFFFF !important;
+}
+
 div.stButton > button[kind="primary"]:hover {
     background: #1D4ED8;
-    color: #FFFFFF;
+    color: #FFFFFF !important;
 }
 
 div[data-testid="stTextInput"] input {
