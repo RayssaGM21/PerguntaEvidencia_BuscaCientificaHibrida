@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from src.config import Paths
-from src.data_loader import download_beir_dataset, load_beir_split
+from src.config import PROJECT_ROOT, Paths
+from src.data_loader import dataset_is_available, download_beir_dataset, load_beir_split
 from src.metrics import MetricSet, evaluate_query
 from src.retrievers.bm25 import BM25Retriever
 from src.retrievers.dense import DEFAULT_DENSE_MODEL, DenseRetriever
@@ -33,6 +33,7 @@ MODEL_LABELS = {
 MODEL_ORDER = ["bm25", "dense", "hybrid", "hybrid_reranker"]
 HYBRID_ALPHA = 0.5
 RERANKER_CANDIDATE_POOL = 20
+DEMO_DATA_DIR = PROJECT_ROOT / "demo_data"
 
 
 def load_ranking(paths: Paths, dataset: str, model: str, split: str) -> dict[str, dict[str, float]]:
@@ -48,6 +49,7 @@ class DatasetBundle:
     corpus: dict[str, dict[str, str]]
     queries: dict[str, str]
     qrels: dict[str, dict[str, int]]
+    benchmark_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -64,9 +66,26 @@ def normalize_query(text: str) -> str:
 
 def load_dataset_bundle(dataset: str, split: str = "test", paths: Paths | None = None) -> DatasetBundle:
     paths = paths or Paths()
-    download_beir_dataset(dataset, paths)
-    corpus, queries, qrels = load_beir_split(dataset, split, paths)
-    return DatasetBundle(dataset=dataset, split=split, corpus=corpus, queries=queries, qrels=qrels)
+    source_paths = paths
+    benchmark_only = False
+
+    if not dataset_is_available(dataset, source_paths):
+        bundled_paths = replace(paths, data_dir=DEMO_DATA_DIR)
+        if dataset_is_available(dataset, bundled_paths):
+            source_paths = bundled_paths
+            benchmark_only = dataset == "trec-covid"
+        else:
+            download_beir_dataset(dataset, source_paths)
+
+    corpus, queries, qrels = load_beir_split(dataset, split, source_paths)
+    return DatasetBundle(
+        dataset=dataset,
+        split=split,
+        corpus=corpus,
+        queries=queries,
+        qrels=qrels,
+        benchmark_only=benchmark_only,
+    )
 
 
 def find_matching_query_id(query_text: str, queries: dict[str, str]) -> str | None:
@@ -294,7 +313,7 @@ def rankings_for_free_query(
     query: str,
     corpus: dict[str, dict[str, str]],
     bm25: BM25Retriever,
-    dense_resources: DenseResources,
+    dense_resources: DenseResources | None,
     reranker: CrossEncoderReranker | None,
     selected_models: list[str],
     top_k: int = 100,
@@ -306,6 +325,8 @@ def rankings_for_free_query(
     if needs_bm25:
         rankings["bm25"] = bm25_search(bm25, query, top_k=top_k)
     if needs_dense:
+        if dense_resources is None:
+            raise ValueError("Dense resources are required for the selected models.")
         rankings["dense"] = dense_search(dense_resources, query, top_k=top_k)
     if any(model in selected_models for model in ("hybrid", "hybrid_reranker")):
         rankings["hybrid"] = hybrid_search(rankings["bm25"], rankings["dense"], top_k=top_k)

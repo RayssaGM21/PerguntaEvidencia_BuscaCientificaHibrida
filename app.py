@@ -149,6 +149,14 @@ def run_search(
         st.warning("Escolha pelo menos um modelo.")
         return
 
+    if not has_ground_truth and bundle.benchmark_only:
+        status_box(
+            "info",
+            "TREC-COVID em modo benchmark",
+            "Na versao publicada, este dataset usa os rankings pre-calculados. Digite uma query existente no benchmark para explorar os resultados sem recalcular o corpus completo na nuvem.",
+        )
+        return
+
     with st.spinner("Explorando documentos e preparando rankings..."):
         if has_ground_truth:
             model_rankings = rankings_for_existing_query(
@@ -162,7 +170,8 @@ def run_search(
             display_query = bundle.queries[matching_query_id]
         else:
             bm25 = cached_bm25(dataset)
-            dense_resources = cached_dense_resources(dataset)
+            needs_dense = any(model in models for model in ("dense", "hybrid", "hybrid_reranker"))
+            dense_resources = cached_dense_resources(dataset) if needs_dense else None
             reranker = cached_reranker() if "hybrid_reranker" in models else None
             model_rankings = rankings_for_free_query(
                 query_text,

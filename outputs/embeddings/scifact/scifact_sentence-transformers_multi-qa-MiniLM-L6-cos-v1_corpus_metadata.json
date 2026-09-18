@@ -1,0 +1,11 @@
+{
+  "dataset": "scifact",
+  "model_name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+  "kind": "corpus",
+  "embedding_shape": [
+    5183,
+    384
+  ],
+  "normalized": true,
+  "similarity": "cosine_via_inner_product"
+}
