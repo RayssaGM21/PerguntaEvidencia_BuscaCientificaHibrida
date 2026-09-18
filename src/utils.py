@@ -27,6 +27,10 @@ def document_text(document: dict[str, str]) -> str:
     return f"{title}. {text}".strip()
 
 
+def ranking_to_list(ranking: dict[str, float]) -> list[tuple[str, float]]:
+    return sorted(ranking.items(), key=lambda item: item[1], reverse=True)
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as file:

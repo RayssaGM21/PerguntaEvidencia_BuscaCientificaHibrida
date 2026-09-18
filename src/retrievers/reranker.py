@@ -4,8 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from src.evaluation.io import ranking_to_list
-from src.utils import document_text
+from src.utils import document_text, ranking_to_list
 
 
 DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-2-v2"

@@ -1,0 +1,1 @@
+"""Scientific IR benchmark package."""

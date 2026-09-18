@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.evaluation.io import ranking_to_list
+from src.utils import ranking_to_list
 
 
 def reciprocal_rank_fusion(

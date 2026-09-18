@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,14 +8,13 @@ import numpy as np
 import pandas as pd
 
 from src.config import Paths
-from src.data_loader import load_beir_split
-from src.evaluation.io import load_ranking, ranking_to_list
+from src.data_loader import download_beir_dataset, load_beir_split
 from src.metrics import MetricSet, evaluate_query
 from src.retrievers.bm25 import BM25Retriever
 from src.retrievers.dense import DEFAULT_DENSE_MODEL, DenseRetriever
 from src.retrievers.hybrid import weighted_score_fusion
 from src.retrievers.reranker import CrossEncoderReranker
-from src.utils import document_text, tokenize
+from src.utils import document_text, ranking_to_list, tokenize
 
 
 DATASET_LABELS = {
@@ -33,6 +33,12 @@ MODEL_LABELS = {
 MODEL_ORDER = ["bm25", "dense", "hybrid", "hybrid_reranker"]
 HYBRID_ALPHA = 0.5
 RERANKER_CANDIDATE_POOL = 20
+
+
+def load_ranking(paths: Paths, dataset: str, model: str, split: str) -> dict[str, dict[str, float]]:
+    ranking_path = paths.rankings_dir / f"{dataset}_{model}_{split}.json"
+    with ranking_path.open("r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,7 @@ def normalize_query(text: str) -> str:
 
 def load_dataset_bundle(dataset: str, split: str = "test", paths: Paths | None = None) -> DatasetBundle:
     paths = paths or Paths()
+    download_beir_dataset(dataset, paths)
     corpus, queries, qrels = load_beir_split(dataset, split, paths)
     return DatasetBundle(dataset=dataset, split=split, corpus=corpus, queries=queries, qrels=qrels)
 
